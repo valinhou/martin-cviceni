@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Galerie animací</title>
+<style>
+  :root{--bg:#0d1412;--card:#16211e;--card2:#1c2a26;--line:#28403a;--text:#eef6f3;--muted:#8fb0a6;--accent:#34d399;--miss:#fb7185}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,"Segoe UI",Roboto,sans-serif}
+  .wrap{max-width:1300px;margin:0 auto;padding:16px}
+  h1{font-size:18px;margin:0 0 10px}
+  .ctl{position:sticky;top:0;z-index:5;display:flex;gap:12px;align-items:center;flex-wrap:wrap;background:rgba(13,20,18,.94);
+    border:1px solid var(--line);border-radius:12px;padding:8px 12px;margin-bottom:12px}
+  .ctl input[type=range]{flex:1;min-width:160px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+  .card h2{font-size:13px;margin:0;padding:10px 12px 4px;display:flex;justify-content:space-between;gap:8px}
+  .card h2 small{color:var(--muted);font-weight:400}
+  .card.missing h2 small{color:var(--miss)}
+  canvas{display:block;width:100%;aspect-ratio:400/250;background:var(--card2)}
+  .phase{margin:8px 12px 10px;text-align:center;font-weight:700;font-size:14px;color:var(--accent);min-height:20px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Galerie animací (vývojová stránka) – filtr: <code>?only=klic1,klic2</code></h1>
+  <div class="ctl">
+    <label><input type="checkbox" id="frz"> Zmrazit</label>
+    <input type="range" id="sl" min="0" max="1" step="0.01" value="0.5" disabled>
+    <span id="tv">živě</span>
+  </div>
+  <div class="grid" id="grid"></div>
+</div>
+<script src="anim-jadro.js"></script>
+<script src="anim-nohy.js"></script>
+<script src="anim-trup.js"></script>
+<script src="anim-protazeni.js"></script>
+<script src="cviky.js"></script>
+<script>
+(function () {
+  var F = window.FitAnim, grid = document.getElementById('grid');
+  var only = (new URLSearchParams(location.search).get('only') || '').split(',').filter(Boolean);
+  var keys = window.CVIKY.list.map(function (e) { return e.id; });
+  F.keys().forEach(function (k) { if (keys.indexOf(k) < 0) keys.push(k); });
+  if (only.length) keys = keys.filter(function (k) { return only.indexOf(k) >= 0; });
+  keys.forEach(function (k) {
+    var ex = window.CVIKY.by[k], has = !!F.get(k), card = document.createElement('div');
+    card.className = 'card' + (has ? '' : ' missing');
+    card.innerHTML = '<h2><span></span><small></small></h2><canvas></canvas><div class="phase"></div>';
+    card.querySelector('span').textContent = ex ? ex.name : k;
+    card.querySelector('small').textContent = k + (has ? ' · ' + F.get(k).view : ' · CHYBÍ');
+    var cv = card.querySelector('canvas'); cv.className = 'fitanim'; cv.setAttribute('data-anim', has ? k : 'none');
+    cv._label = card.querySelector('.phase'); grid.appendChild(card);
+  });
+  F.onPhase = function (cv, info) { if (F.freeze == null && cv._label) cv._label.textContent = info.label || ''; };
+  var frz = document.getElementById('frz'), sl = document.getElementById('sl'), tv = document.getElementById('tv');
+  function ap() { F.freeze = frz.checked ? parseFloat(sl.value) : null; sl.disabled = !frz.checked; tv.textContent = frz.checked ? 't = ' + sl.value : 'živě'; }
+  frz.onchange = ap; sl.oninput = ap;
+  F.start();
+})();
+</script>
+</body>
+</html>

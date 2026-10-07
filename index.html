@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0d1412">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="ikona.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="ikona.svg">
+<title>Martin – Cvičení</title>
+<style>
+  :root{
+    --bg:#0d1412; --bg2:#121c19; --card:#16211e; --card2:#1c2a26; --line:#28403a;
+    --text:#eef6f3; --muted:#8fb0a6; --accent:#34d399; --accent2:#10b981; --accent-soft:#163a2f;
+    --amber:#fbbf24; --orange:#fb923c; --red:#fb7185; --blue:#60a5fa;
+    --shadow:0 8px 30px rgba(0,0,0,.35);
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0; padding:0;}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; background:linear-gradient(180deg,#0f1a17,#0d1412 40%);
+    color:var(--text); min-height:100vh; padding-bottom:calc(84px + env(safe-area-inset-bottom)); -webkit-font-smoothing:antialiased;}
+  .wrap{max-width:600px; margin:0 auto; padding:0 16px;}
+  header{padding:22px 0 6px; display:flex; justify-content:space-between; align-items:flex-end; gap:12px;}
+  header h1{margin:0; font-size:22px;}
+  header .sub{color:var(--muted); font-size:13px; margin-top:2px;}
+  .lvl{background:var(--accent-soft); color:var(--accent); border:1px solid #1f5644; border-radius:999px; padding:6px 12px; font-weight:700; font-size:13px; white-space:nowrap;}
+  h2{font-size:17px; margin:22px 0 10px;}
+  h3{font-size:15px; margin:0 0 8px;}
+  .card{background:var(--card); border:1px solid var(--line); border-radius:18px; padding:16px; margin:12px 0; box-shadow:var(--shadow);}
+  .card.soft{box-shadow:none;}
+  .muted{color:var(--muted);} .small{font-size:13px;} .tiny{font-size:12px;}
+  .row{display:flex; gap:10px; align-items:center;} .between{justify-content:space-between;} .wrapf{flex-wrap:wrap;}
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+  .grid3{display:grid; grid-template-columns:repeat(3,1fr); gap:8px;}
+  .stat{background:var(--card2); border:1px solid var(--line); border-radius:14px; padding:10px 12px;}
+  .stat b{display:block; font-size:20px; margin-top:2px;} .stat span{font-size:12px; color:var(--muted);}
+  button{font:inherit; color:inherit; cursor:pointer; border:none; background:none;}
+  .btn{display:inline-flex; align-items:center; justify-content:center; gap:8px; padding:12px 16px; border-radius:14px; background:var(--card2);
+    border:1px solid var(--line); font-weight:600; font-size:15px; min-height:46px;}
+  .btn.primary{background:linear-gradient(135deg,var(--accent2),#059669); border-color:transparent; color:#04130d;}
+  .btn.big{width:100%; font-size:18px; padding:16px; min-height:58px;}
+  .btn.ghost{background:transparent;}
+  .btn.danger{color:var(--red);}
+  .btn.sm{padding:8px 12px; min-height:36px; font-size:13px; border-radius:11px;}
+  .chips{display:flex; gap:8px; flex-wrap:wrap;}
+  .chip{padding:8px 12px; border-radius:999px; background:var(--card2); border:1px solid var(--line); font-size:13px; font-weight:600;}
+  .chip.on{background:var(--accent-soft); color:var(--accent); border-color:#1f5644;}
+  input,select,textarea{font:inherit; color:var(--text); background:var(--bg2); border:1px solid var(--line); border-radius:12px; padding:11px 12px; width:100%; min-height:44px;}
+  textarea{min-height:80px; resize:vertical;}
+  input[type=range]{accent-color:var(--accent2); padding:0; border:none; background:none;}
+  label.f{display:block; font-size:13px; color:var(--muted); margin:10px 0 4px;}
+  .remind{background:linear-gradient(135deg,#0f2f3b,#132a24); border-color:#1d4d5a;}
+  .remind .big{font-size:18px; font-weight:700; line-height:1.35;}
+  .rules{display:flex; flex-wrap:wrap; gap:6px; margin-top:10px;}
+  .rules span{font-size:12px; background:rgba(251,113,133,.12); color:#fecdd3; border:1px solid rgba(251,113,133,.3); padding:4px 9px; border-radius:999px;}
+  .blk{border-top:1px solid var(--line); padding-top:10px; margin-top:10px;}
+  .blk h4{margin:0 0 6px; font-size:13px; color:var(--accent); text-transform:uppercase; letter-spacing:.04em;}
+  .exl{display:flex; justify-content:space-between; gap:10px; padding:5px 0; font-size:14px;}
+  .exl .d{color:var(--muted); white-space:nowrap;}
+  .tag{display:inline-block; font-size:11px; padding:2px 7px; border-radius:999px; background:var(--card2); border:1px solid var(--line); color:var(--muted); margin-left:4px; vertical-align:middle;}
+  .tag.sh{color:var(--amber); border-color:rgba(251,191,36,.35);}
+  .tag.new{color:var(--accent); border-color:#1f5644;}
+  canvas.fitanim{display:block; width:100%; aspect-ratio:400/250; background:var(--card2); border-radius:14px;}
+  nav{position:fixed; left:0; right:0; bottom:0; background:rgba(13,20,18,.96); backdrop-filter:blur(8px); border-top:1px solid var(--line);
+    display:flex; justify-content:center; padding-bottom:env(safe-area-inset-bottom); z-index:20;}
+  nav .in{display:flex; max-width:600px; width:100%;}
+  nav button{flex:1; padding:9px 0 10px; font-size:11px; color:var(--muted); display:flex; flex-direction:column; align-items:center; gap:2px;}
+  nav button .i{font-size:21px;}
+  nav button.on{color:var(--accent);}
+  .view{display:none;} .view.on{display:block;}
+  .toast{position:fixed; left:50%; bottom:calc(96px + env(safe-area-inset-bottom)); transform:translateX(-50%); background:#0b2a20; border:1px solid #1f5644; color:var(--text);
+    padding:12px 18px; border-radius:14px; z-index:100; box-shadow:var(--shadow); font-weight:600; max-width:90vw; text-align:center;}
+  .modalbg{position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:60; display:flex; align-items:flex-end; justify-content:center;}
+  .modal{background:var(--card); border:1px solid var(--line); border-radius:22px 22px 0 0; width:100%; max-width:600px; padding:20px 16px calc(20px + env(safe-area-inset-bottom)); max-height:90vh; overflow:auto;}
+  /* ------ průvodce tréninkem ------ */
+  .run{position:fixed; inset:0; background:var(--bg); z-index:50; overflow:auto; padding-bottom:env(safe-area-inset-bottom);}
+  .run .top{display:flex; align-items:center; gap:10px; padding:12px 16px 6px; max-width:600px; margin:0 auto;}
+  .run .top .lbl{flex:1; font-size:13px; color:var(--muted);}
+  .run .top .lbl b{color:var(--text); font-size:14px; display:block;}
+  .bar{height:6px; background:var(--card2); border-radius:9px; overflow:hidden; margin:0 16px;}
+  .bar i{display:block; height:100%; background:linear-gradient(90deg,var(--accent2),var(--accent)); width:0; transition:width .3s;}
+  .run .body{max-width:600px; margin:0 auto; padding:10px 16px 20px;}
+  .run .exname{font-size:22px; font-weight:800; margin:12px 0 2px; line-height:1.2;}
+  .run .dose{font-size:40px; font-weight:800; color:var(--accent); margin:6px 0; font-variant-numeric:tabular-nums;}
+  .run .dose small{font-size:16px; color:var(--muted); font-weight:600;}
+  .run .phase{font-size:16px; font-weight:700; color:var(--orange); min-height:22px; text-align:center; margin-top:6px;}
+  .timer{font-size:72px; font-weight:800; text-align:center; font-variant-numeric:tabular-nums; line-height:1; margin:10px 0;}
+  .timer.prep{color:var(--amber);} .timer.rest{color:var(--blue);}
+  .cues{margin:10px 0 0; padding-left:20px; color:#cfe3dc; font-size:14px; line-height:1.5;}
+  .why{font-size:13px; color:var(--muted); margin-top:8px;}
+  .drink{background:rgba(96,165,250,.12); border:1px solid rgba(96,165,250,.35); color:#dbeafe; padding:12px; border-radius:14px; font-weight:700; text-align:center; margin:12px 0;}
+  .fb{display:grid; gap:10px; margin-top:12px;}
+  .fb button{display:flex; align-items:center; gap:14px; padding:14px 16px; border-radius:16px; background:var(--card2); border:1px solid var(--line); font-size:16px; font-weight:700; text-align:left;}
+  .fb button .e{font-size:30px;} .fb button small{display:block; font-weight:500; color:var(--muted); font-size:12px;}
+  .cal{display:grid; grid-template-columns:repeat(7,1fr); gap:5px;}
+  .cal div{aspect-ratio:1; border-radius:7px; background:var(--card2); display:flex; align-items:center; justify-content:center; font-size:11px; color:var(--muted);}
+  .cal div.done{background:var(--accent2); color:#04130d; font-weight:700;}
+  .cal div.today{outline:2px solid var(--accent);}
+  .cal div.fut{opacity:.35;}
+  .hist{display:flex; justify-content:space-between; gap:10px; padding:9px 0; border-bottom:1px solid var(--line); font-size:14px;}
+  .hist:last-child{border-bottom:none;}
+  .ai{white-space:pre-wrap; line-height:1.5; font-size:14px; background:var(--bg2); border:1px solid var(--line); border-radius:12px; padding:12px; margin-top:10px;}
+  .exc{border-top:1px solid var(--line); padding:10px 0;}
+  .exc:first-child{border-top:none;}
+  .exc .hd{display:flex; justify-content:space-between; gap:10px; align-items:center; width:100%; text-align:left;}
+  .exc .det{display:none; margin-top:10px;} .exc.open .det{display:block;}
+  .note{font-size:12px; color:var(--muted); line-height:1.45;}
+  .warn{color:var(--amber);}
+  svg text{font-family:inherit;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div><h1 id="hello">Ahoj Martine 👋</h1><div class="sub" id="today"></div></div>
+    <div class="lvl" id="lvlBadge"></div>
+  </header>
+
+  <section class="view on" id="v-dnes"></section>
+  <section class="view" id="v-vaha"></section>
+  <section class="view" id="v-pokrok"></section>
+  <section class="view" id="v-cviky"></section>
+  <section class="view" id="v-nast"></section>
+</div>
+
+<nav><div class="in">
+  <button data-v="dnes" class="on"><span class="i">🏠</span>Dnes</button>
+  <button data-v="vaha"><span class="i">⚖️</span>Váha</button>
+  <button data-v="pokrok"><span class="i">📈</span>Pokrok</button>
+  <button data-v="cviky"><span class="i">📚</span>Cviky</button>
+  <button data-v="nast"><span class="i">⚙️</span>Nastavení</button>
+</div></nav>
+
+<div id="runRoot"></div>
+<div id="modalRoot"></div>
+
+<script src="anim-jadro.js"></script>
+<script src="anim-nohy.js"></script>
+<script src="anim-trup.js"></script>
+<script src="anim-protazeni.js"></script>
+<script src="cviky.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

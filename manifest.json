@@ -1,0 +1,13 @@
+{
+  "name": "Martin – Cvičení",
+  "short_name": "Cvičení",
+  "lang": "cs",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0d1412",
+  "theme_color": "#0d1412",
+  "icons": [
+    { "src": "ikona.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
