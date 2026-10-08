@@ -618,7 +618,7 @@ function importData(inp) {
 function resetAll() { if (!confirm('Opravdu smazat všechna data (tréninky, váhu, cíl)?')) return; if (!confirm('Fakt? Nejde to vrátit.')) return; S = DEF(); save(); renderAll(); }
 
 /* ============================== OpenAI ============================== */
-const OAI_API = 'https://api.openai.com/v1/', OAI_DEFAULT_MODEL = 'gpt-5.6-luna';
+const OAI_API = 'https://api.openai.com/v1/', OAI_DEFAULT_MODEL = 'gpt-6-luna', OAI_FALLBACK_MODEL = 'gpt-5.6-luna';
 function oaiKey() { try { return localStorage.getItem(OAI_KEY_STORE) || ''; } catch (e) { return ''; } }
 function saveKey() { const v = ($('#oaiKey').value || '').trim(); if (!v) { toast('Vlož klíč 🙂'); return; } try { localStorage.setItem(OAI_KEY_STORE, v); } catch (e) {} S.ai.model = null; save(); renderNast(); renderPokrok(); testKey(); }
 function removeKey() { if (!confirm('Odebrat OpenAI klíč z tohoto zařízení?')) return; try { localStorage.removeItem(OAI_KEY_STORE); } catch (e) {} S.ai.model = null; save(); renderNast(); renderPokrok(); }
@@ -628,17 +628,31 @@ async function oaiFetch(path, opts) {
   if (!r.ok) { const er = (body && body.error) || {}; const err = new Error(er.message || ('HTTP ' + r.status)); err.status = r.status; err.code = er.code || ''; throw err; }
   return body;
 }
+// preferuje GPT-6 Luna; když ho účet nenabízí, vezme nejnovější dostupnou Lunu (záloha gpt-5.6-luna)
 async function oaiModel() {
-  if (S.ai.model) return S.ai.model;
+  if (S.ai.model && S.ai.pref === OAI_DEFAULT_MODEL) return S.ai.model;
   let pick = OAI_DEFAULT_MODEL;
   try {
     const res = await oaiFetch('models', { method: 'GET' });
-    const ids = (res.data || []).map(m => m.id).filter(id => /luna/i.test(id) && !/audio|realtime|search|transcribe|tts|image/i.test(id));
+    const ids = (res.data || []).map(m => m.id).filter(id => /luna/i.test(id) && !/audio|realtime|search|transcribe|tts|image|batch/i.test(id));
     const ver = id => { const m = id.match(/gpt-(\d+(?:\.\d+)?)/); return m ? parseFloat(m[1]) : 0; };
-    ids.sort((a, b) => (ver(b) - ver(a)) || ((/\d{4}-\d{2}-\d{2}/.test(a) ? 1 : 0) - (/\d{4}-\d{2}-\d{2}/.test(b) ? 1 : 0)));
-    if (ids.length) pick = ids[0];
+    ids.sort((a, b) => (ver(b) - ver(a)) || ((/\d{4}-\d{2}-\d{2}/.test(a) ? 1 : 0) - (/\d{4}-\d{2}-\d{2}/.test(b) ? 1 : 0)) || (a.length - b.length));
+    if (ids.indexOf(OAI_DEFAULT_MODEL) >= 0) pick = OAI_DEFAULT_MODEL;
+    else if (ids.length) pick = ids[0];
   } catch (e) { if (e.status === 401) throw e; }
-  S.ai.model = pick; save(); return pick;
+  S.ai.model = pick; S.ai.pref = OAI_DEFAULT_MODEL; save(); return pick;
+}
+const isModelErr = e => e.status === 404 || /model_not_found|does not exist|invalid model|unknown model/i.test((e.code || '') + ' ' + (e.message || ''));
+async function oaiChat(messages, maxTok) {
+  const send = model => oaiFetch('chat/completions', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model, messages, reasoning_effort: 'low', max_completion_tokens: maxTok }) });
+  const model = await oaiModel();
+  try { return await send(model); }
+  catch (e) {
+    if (!isModelErr(e) || model === OAI_FALLBACK_MODEL) throw e;
+    S.ai.model = OAI_FALLBACK_MODEL; save();               // GPT-6 Luna na účtu není – jedeme na zálohu
+    return await send(OAI_FALLBACK_MODEL);
+  }
 }
 function oaiErr(e) {
   const m = (e.message || '') + ' ' + (e.code || '');
@@ -651,7 +665,7 @@ function oaiErr(e) {
 }
 async function testKey() {
   const st = $('#oaiStatus'); if (st) st.textContent = '⏳ Ověřuji…';
-  try { S.ai.model = null; const m = await oaiModel(); if (st) st.textContent = '✅ Funguje, model ' + m; renderNast(); toast('Klíč funguje ✅'); }
+  try { S.ai.model = null; await oaiChat([{ role: 'user', content: 'Odpověz jen: OK' }], 200); renderNast(); const s2 = $('#oaiStatus'); if (s2) s2.textContent = '✅ Funguje, model ' + S.ai.model; toast('Klíč funguje ✅ (' + S.ai.model + ')'); }
   catch (e) { if (st) st.textContent = '⚠️ ' + oaiErr(e); }
 }
 function aiContext() {
@@ -673,9 +687,7 @@ const AI_SYS = 'Jsi kondiční trenér amatérského fotbalisty Martina. Cvičí
 async function aiCall(user) {
   const out = $('#aiOut'); if (out) out.innerHTML = '<div class="ai">⏳ Trenér přemýšlí…</div>';
   try {
-    const model = await oaiModel();
-    const res = await oaiFetch('chat/completions', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model, messages: [{ role: 'system', content: AI_SYS }, { role: 'user', content: user }], reasoning_effort: 'low', max_completion_tokens: 1500 }) });
+    const res = await oaiChat([{ role: 'system', content: AI_SYS }, { role: 'user', content: user }], 1500);
     const txt = ((res.choices && res.choices[0] && res.choices[0].message && res.choices[0].message.content) || '').trim() || '(prázdná odpověď)';
     const mo = dateStr().slice(0, 7); if (S.ai.month !== mo) { S.ai.month = mo; S.ai.calls = 0; S.ai.tokIn = 0; S.ai.tokOut = 0; }
     S.ai.calls++; if (res.usage) { S.ai.tokIn += res.usage.prompt_tokens || 0; S.ai.tokOut += res.usage.completion_tokens || 0; }
