@@ -587,6 +587,7 @@ function renderNast() {
       '<div class="small muted" style="margin-top:6px;">Tento měsíc: ' + (S.ai.month === dateStr().slice(0, 7) ? S.ai.calls + ' dotazů, ' + (S.ai.tokIn + S.ai.tokOut) + ' tokenů' : '0 dotazů') + '</div>' +
       '<div class="row" style="margin-top:10px;"><button class="btn sm" onclick="testKey()">Ověřit</button><button class="btn sm danger" onclick="removeKey()">Odebrat klíč</button></div>'
       : '<input id="oaiKey" type="password" placeholder="sk-..." autocomplete="off" style="margin-top:10px;"><button class="btn" style="margin-top:8px;" onclick="saveKey()">Uložit klíč</button><div class="small muted" id="oaiStatus"></div>') + '</div>';
+  if (window.chatNastCard) h += window.chatNastCard();
   h += '<div class="card"><h3>💾 Záloha dat</h3><div class="note">Data jsou jen v tomto prohlížeči. Občas si stáhni zálohu.</div><div class="row wrapf" style="margin-top:10px;"><button class="btn sm" onclick="exportData()">⬇ Stáhnout zálohu</button><label class="btn sm">⬆ Obnovit ze zálohy<input type="file" accept=".json,application/json" style="display:none" onchange="importData(this)"></label><button class="btn sm danger" onclick="resetAll()">Smazat vše</button></div></div>';
   h += '<div class="note" style="text-align:center;margin:16px 0;">Při ostré bolesti (hlavně v rameni, koleni, zádech) cvik vynech. Aplikace nenahrazuje lékaře ani fyzioterapeuta.</div>';
   $('#v-nast').innerHTML = h;
