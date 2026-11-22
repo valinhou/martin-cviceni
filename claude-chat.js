@@ -13,11 +13,18 @@
   function loadCfg() { try { const c = JSON.parse(ls(CFG_KEY) || 'null'); return c && c.url && c.klic ? c : null; } catch (e) { return null; } }
 
   /* párování odkazem: …/index.html#most=<base64 JSON {url, klic}> */
+  // z textu s „most=…“ vytáhne {url, klic}; jinak null (výjimka = poškozený odkaz)
+  function parseOdkaz(text) {
+    const m = String(text || '').match(/most=([^&#\s]+)/); if (!m) return null;
+    const c = JSON.parse(atob(decodeURIComponent(m[1]).replace(/-/g, '+').replace(/_/g, '/')));
+    if (!c || !c.url || !c.klic) throw new Error('neúplný odkaz');
+    return { url: String(c.url).replace(/\/+$/, ''), klic: String(c.klic) };
+  }
   (function pair() {
-    const m = location.hash.match(/most=([^&]+)/); if (!m) return;
+    if (!/most=/.test(location.hash)) return;
     try {
-      const c = JSON.parse(atob(decodeURIComponent(m[1]).replace(/-/g, '+').replace(/_/g, '/')));
-      if (c.url && c.klic) { ls(CFG_KEY, JSON.stringify({ url: String(c.url).replace(/\/+$/, ''), klic: String(c.klic) })); setTimeout(() => toast('💬 Chat s Claudem je propojený ✅', 3500), 1200); }
+      const c = parseOdkaz(location.hash);
+      if (c) { ls(CFG_KEY, JSON.stringify(c)); setTimeout(() => toast('💬 Chat s Claudem je propojený ✅', 3500), 1200); }
     } catch (e) { setTimeout(() => toast('⚠️ Neplatný párovací odkaz'), 1200); }
     history.replaceState(null, '', location.pathname + location.search);
   })();
@@ -100,14 +107,18 @@
   window.chatNastCard = function () {
     return '<div class="card"><h3>💬 Úpravy aplikace s Claudem</h3>' +
       (cfg ? '<div class="small">✅ Propojeno · <span class="muted">' + esc(cfg.url) + '</span></div><div class="row" style="margin-top:10px;"><button class="btn sm" onclick="ccOpen()">Otevřít chat</button><button class="btn sm danger" onclick="ccUnpair()">Odpojit</button></div>'
-        : '<div class="note">Propojení otevřeš párovacím odkazem z PC (soubor PAROVANI.txt ve složce claude-most), nebo vyplň adresu a klíč ručně.</div>' +
+        : '<div class="note">Vlož do prvního pole celý párovací odkaz z PC (soubor PAROVANI.txt ve složce claude-most) a dej Propojit. Nebo vyplň adresu a klíč ručně.</div>' +
           '<input id="ccUrl" placeholder="https://….ts.net" style="margin-top:10px;"><input id="ccKlic" type="password" placeholder="Klíč" autocomplete="off" style="margin-top:8px;"><button class="btn" style="margin-top:8px;" onclick="ccPair()">Propojit</button>') +
       '<div class="note" style="margin-top:8px;">Verze aplikace: ' + esc(verze || '?') + ' · nová verze se načte sama.</div></div>';
   };
   window.ccOpen = openChat;
   window.ccPair = function () {
-    const url = ($('#ccUrl').value || '').trim().replace(/\/+$/, ''), klic = ($('#ccKlic').value || '').trim();
-    if (!/^https:\/\//.test(url) || !klic) { toast('Vyplň https adresu i klíč'); return; }
+    let url = ($('#ccUrl').value || '').trim().replace(/\/+$/, ''), klic = ($('#ccKlic').value || '').trim();
+    // do pole jde vložit i celý párovací odkaz z PAROVANI.txt – adresa i klíč se vezmou z něj
+    let z = null;
+    try { z = parseOdkaz(url) || parseOdkaz(klic); } catch (e) { toast('⚠️ Neplatný párovací odkaz'); return; }
+    if (z) { url = z.url; klic = z.klic; }
+    if (!/^https:\/\//.test(url) || !klic) { toast('Vlož párovací odkaz, nebo vyplň https adresu i klíč'); return; }
     ls(CFG_KEY, JSON.stringify({ url, klic })); cfg = loadCfg(); renderNast(); poll(); restartPoll(); toast('Propojeno ✅');
   };
   window.ccUnpair = function () { if (!confirm('Odpojit chat s Claudem v tomto zařízení?')) return; ls(CFG_KEY, null); cfg = null; msgs = []; restartPoll(); fab(); renderNast(); };
