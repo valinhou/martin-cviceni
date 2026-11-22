@@ -1,12 +1,14 @@
 /* =====================================================================
    app.js – Martin: domácí cvičení (vlastní váha), progrese podle zpětné vazby,
-   hubnutí, připomínky pitného režimu, volitelný AI trenér (OpenAI).
-   Data jen v tomto zařízení (localStorage). OpenAI klíč zvlášť, nejde do zálohy.
+   hubnutí, připomínky pitného režimu, volitelný AI trenér (Claude Sonnet 5.5,
+   záloha OpenAI GPT-6 Luna). Data jen v tomto zařízení (localStorage).
+   API klíče zvlášť, nejdou do zálohy.
    ===================================================================== */
 'use strict';
 
 const STORE_KEY = 'martin_cviceni_v1';
 const OAI_KEY_STORE = 'martin_openai_key';
+const CL_KEY_STORE = 'martin_claude_key';
 const EX = window.CVIKY.by, DNY = window.CVIKY.dny;
 
 /* ------------------------------ stav ------------------------------ */
@@ -516,9 +518,9 @@ function renderPokrok() {
   const upcoming = window.CVIKY.list.filter(e => (e.unlock || 0) > S.level && allowed(e)).sort((a, b) => a.unlock - b.unlock).slice(0, 4);
   if (upcoming.length) h += '<div class="card"><h3>🔒 Brzy se odemkne</h3>' + upcoming.map(e => '<div class="exl"><span>' + esc(e.name) + '</span><span class="d">úroveň ' + lvlTxt(e.unlock) + '</span></div>').join('') + '</div>';
   // AI trenér
-  const hasKey = !!oaiKey();
+  const hasKey = !!(clKey() || oaiKey());
   h += '<div class="card"><h3>🤖 AI trenér</h3>';
-  if (!hasKey) h += '<div class="small muted">Volitelné: vlož OpenAI API klíč v Nastavení a trenér ti zhodnotí pokrok, hubnutí a odpoví na otázky (např. „bolí mě koleno, co vynechat?“). Stojí zlomky haléře za dotaz.</div>';
+  if (!hasKey) h += '<div class="small muted">Volitelné: vlož Claude API klíč (nebo OpenAI) v Nastavení a trenér ti zhodnotí pokrok, hubnutí a odpoví na otázky (např. „bolí mě koleno, co vynechat?“). Stojí zlomky haléře za dotaz.</div>';
   else {
     h += '<button class="btn" onclick="aiReview()">📋 Zhodnoť můj pokrok</button>' +
       '<label class="f">Zeptej se trenéra</label><textarea id="aiQ" placeholder="Např. Po bulharských dřepech mě pobolívá koleno, co s tím?"></textarea><button class="btn" style="margin-top:8px;" onclick="aiAsk()">Zeptat se</button>';
@@ -567,7 +569,7 @@ function toggleExc(id) {
 
 /* ============================== Nastavení ============================== */
 function renderNast() {
-  const st = S.settings, hasKey = !!oaiKey();
+  const st = S.settings;
   let h = '<div class="card"><h3>Trénink</h3>' +
     '<label class="f">Maximální délka tréninku: <b id="mmV">' + st.maxMin + ' min</b></label><input type="range" min="15" max="30" step="5" value="' + st.maxMin + '" oninput="$(\'#mmV\').textContent=this.value+\' min\'" onchange="setS(\'maxMin\',+this.value)">' +
     '<div class="note">Délka roste s úrovní automaticky: začínáš na ~15 min, kolem úrovně 7 je to ~20 min a dál až k tomuto maximu.</div>' +
@@ -582,11 +584,13 @@ function renderNast() {
     '<label class="f">Časy připomínek pití a jídelních zákazů</label><div class="grid3">' + st.remindTimes.map((t, i) => '<input type="time" value="' + t + '" onchange="setRemind(' + i + ',this.value)">').join('') + '</div>' +
     '<label class="f">Připomínka tréninku</label><input type="time" value="' + st.trainTime + '" onchange="setS(\'trainTime\',this.value,true)">' +
     '<button class="btn" style="margin-top:12px;width:100%;" onclick="downloadIcs()">📅 Stáhnout denní připomínky do kalendáře</button></div>';
-  h += '<div class="card"><h3>🤖 AI trenér (OpenAI)</h3><div class="note">Volitelné. Klíč z <b>platform.openai.com → API keys</b>; na OpenAI si nastav měsíční limit (např. 2 USD). Klíč se ukládá jen v tomto zařízení a nejde do zálohy. Jeden dotaz stojí zlomek haléře.</div>' +
-    (hasKey ? '<div class="small" style="margin-top:10px;">✅ Klíč je uložený' + (S.ai.model ? ' · model <b>' + esc(S.ai.model) + '</b>' : '') + '</div><div class="small muted" id="oaiStatus"></div>' +
-      '<div class="small muted" style="margin-top:6px;">Tento měsíc: ' + (S.ai.month === dateStr().slice(0, 7) ? S.ai.calls + ' dotazů, ' + (S.ai.tokIn + S.ai.tokOut) + ' tokenů' : '0 dotazů') + '</div>' +
-      '<div class="row" style="margin-top:10px;"><button class="btn sm" onclick="testKey()">Ověřit</button><button class="btn sm danger" onclick="removeKey()">Odebrat klíč</button></div>'
-      : '<input id="oaiKey" type="password" placeholder="sk-..." autocomplete="off" style="margin-top:10px;"><button class="btn" style="margin-top:8px;" onclick="saveKey()">Uložit klíč</button><div class="small muted" id="oaiStatus"></div>') + '</div>';
+  const keyBox = (kind, title, has, ph) => '<div style="margin-top:12px;"><b>' + title + '</b>' +
+    (has ? '<div class="small" style="margin-top:6px;">✅ Klíč je uložený</div><div class="small muted" id="' + kind + 'Status"></div>' +
+      '<div class="row" style="margin-top:8px;"><button class="btn sm" onclick="testKey(\'' + kind + '\')">Ověřit</button><button class="btn sm danger" onclick="removeKey(\'' + kind + '\')">Odebrat klíč</button></div>'
+      : '<input id="' + kind + 'Key" type="password" placeholder="' + ph + '" autocomplete="off" style="margin-top:6px;"><button class="btn" style="margin-top:8px;" onclick="saveKey(\'' + kind + '\')">Uložit klíč</button><div class="small muted" id="' + kind + 'Status"></div>') + '</div>';
+  h += '<div class="card"><h3>🤖 AI trenér (Claude)</h3><div class="note">Volitelné. Hlavní je <b>Claude</b> – klíč z <b>platform.claude.com → API Keys</b>; v Billing si nastav měsíční limit (např. 2 USD). OpenAI klíč (<b>platform.openai.com → API keys</b>) je jen záloha, když Claude nejde. Klíče se ukládají jen v tomto zařízení a nejdou do zálohy. Jeden dotaz stojí zlomek koruny.</div>' +
+    keyBox('cl', 'Claude (hlavní)', !!clKey(), 'sk-ant-...') + keyBox('oai', 'OpenAI (záloha)', !!oaiKey(), 'sk-...') +
+    ((clKey() || oaiKey()) ? '<div class="small muted" style="margin-top:10px;">Tento měsíc: ' + (S.ai.month === dateStr().slice(0, 7) ? S.ai.calls + ' dotazů, ' + (S.ai.tokIn + S.ai.tokOut) + ' tokenů' : '0 dotazů') + (S.ai.used ? ' · naposledy odpověděl <b>' + esc(S.ai.used) + '</b>' : '') + '</div>' : '') + '</div>';
   if (window.chatNastCard) h += window.chatNastCard();
   h += '<div class="card"><h3>💾 Záloha dat</h3><div class="note">Data jsou jen v tomto prohlížeči. Občas si stáhni zálohu.</div><div class="row wrapf" style="margin-top:10px;"><button class="btn sm" onclick="exportData()">⬇ Stáhnout zálohu</button><label class="btn sm">⬆ Obnovit ze zálohy<input type="file" accept=".json,application/json" style="display:none" onchange="importData(this)"></label><button class="btn sm danger" onclick="resetAll()">Smazat vše</button></div></div>';
   h += '<div class="note" style="text-align:center;margin:16px 0;">Při ostré bolesti (hlavně v rameni, koleni, zádech) cvik vynech. Aplikace nenahrazuje lékaře ani fyzioterapeuta.</div>';
@@ -618,11 +622,40 @@ function importData(inp) {
 }
 function resetAll() { if (!confirm('Opravdu smazat všechna data (tréninky, váhu, cíl)?')) return; if (!confirm('Fakt? Nejde to vrátit.')) return; S = DEF(); save(); renderAll(); }
 
-/* ============================== OpenAI ============================== */
+/* ======================= AI: Claude (hlavní) + OpenAI (záloha) ======================= */
+const KEY_STORES = { cl: CL_KEY_STORE, oai: OAI_KEY_STORE }, KEY_NAMES = { cl: 'Claude', oai: 'OpenAI' };
+const getKey = kind => { try { return localStorage.getItem(KEY_STORES[kind]) || ''; } catch (e) { return ''; } };
+function oaiKey() { return getKey('oai'); }
+function clKey() { return getKey('cl'); }
+function saveKey(kind) { const v = ($('#' + kind + 'Key').value || '').trim(); if (!v) { toast('Vlož klíč 🙂'); return; } try { localStorage.setItem(KEY_STORES[kind], v); } catch (e) {} if (kind === 'oai') S.ai.model = null; save(); renderNast(); renderPokrok(); testKey(kind); }
+function removeKey(kind) { if (!confirm('Odebrat ' + KEY_NAMES[kind] + ' klíč z tohoto zařízení?')) return; try { localStorage.removeItem(KEY_STORES[kind]); } catch (e) {} if (kind === 'oai') S.ai.model = null; save(); renderNast(); renderPokrok(); }
+
+// Claude Messages API přímo z prohlížeče (statická aplikace bez build kroku, klíč má jen tohle zařízení)
+const CL_API = 'https://api.anthropic.com/v1/messages', CL_MODEL = 'claude-sonnet-5-5';
+async function clChat(system, user, maxTok) {
+  const r = await fetch(CL_API, { method: 'POST', headers: { 'content-type': 'application/json', 'x-api-key': clKey(), 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+    body: JSON.stringify({ model: CL_MODEL, max_tokens: maxTok + 2000, system: system || undefined, messages: [{ role: 'user', content: user }], output_config: { effort: 'low' } }) });
+  let body = null; try { body = await r.json(); } catch (e) {}
+  if (!r.ok) { const er = (body && body.error) || {}; const err = new Error(er.message || ('HTTP ' + r.status)); err.status = r.status; err.code = er.type || ''; err.api = 'cl'; throw err; }
+  if (body.stop_reason === 'refusal') { const err = new Error('Claude odmítl odpovědět'); err.code = 'refusal'; err.api = 'cl'; throw err; }
+  const text = (body.content || []).filter(b => b.type === 'text').map(b => b.text).join('').trim();
+  const u = body.usage || {};
+  return { text, model: CL_MODEL, tokIn: (u.input_tokens || 0) + (u.cache_read_input_tokens || 0), tokOut: u.output_tokens || 0 };
+}
+// jednotné volání: Claude, a když nejde (a je OpenAI klíč), GPT-6 Luna
+async function aiChat(system, user, maxTok) {
+  if (clKey()) {
+    try { return await clChat(system, user, maxTok); }
+    catch (e) { if (!oaiKey()) throw e; console.warn('Claude nešel, beru OpenAI:', e.message); }
+  }
+  const msgs = (system ? [{ role: 'system', content: system }] : []).concat([{ role: 'user', content: user }]);
+  const res = await oaiChat(msgs, maxTok);
+  return { text: ((res.choices && res.choices[0] && res.choices[0].message && res.choices[0].message.content) || '').trim(), model: S.ai.model,
+    tokIn: (res.usage && res.usage.prompt_tokens) || 0, tokOut: (res.usage && res.usage.completion_tokens) || 0 };
+}
+
+/* ------------------------------ OpenAI (záloha) ------------------------------ */
 const OAI_API = 'https://api.openai.com/v1/', OAI_DEFAULT_MODEL = 'gpt-6-luna', OAI_FALLBACK_MODEL = 'gpt-5.6-luna';
-function oaiKey() { try { return localStorage.getItem(OAI_KEY_STORE) || ''; } catch (e) { return ''; } }
-function saveKey() { const v = ($('#oaiKey').value || '').trim(); if (!v) { toast('Vlož klíč 🙂'); return; } try { localStorage.setItem(OAI_KEY_STORE, v); } catch (e) {} S.ai.model = null; save(); renderNast(); renderPokrok(); testKey(); }
-function removeKey() { if (!confirm('Odebrat OpenAI klíč z tohoto zařízení?')) return; try { localStorage.removeItem(OAI_KEY_STORE); } catch (e) {} S.ai.model = null; save(); renderNast(); renderPokrok(); }
 async function oaiFetch(path, opts) {
   const r = await fetch(OAI_API + path, Object.assign({}, opts, { headers: Object.assign({ Authorization: 'Bearer ' + oaiKey() }, (opts && opts.headers) || {}) }));
   let body = null; try { body = await r.json(); } catch (e) {}
@@ -656,18 +689,22 @@ async function oaiChat(messages, maxTok) {
   }
 }
 function oaiErr(e) {
-  const m = (e.message || '') + ' ' + (e.code || '');
+  const m = (e.message || '') + ' ' + (e.code || ''), who = e.api === 'cl' ? 'Claude' : 'OpenAI';
   if (!navigator.onLine) return 'Jsi offline.';
-  if (e.status === 401) return 'Klíč není platný (začíná „sk-“?).';
-  if (/insufficient_quota|billing|quota/i.test(m)) return 'Došel kredit nebo je vyčerpaný měsíční limit na OpenAI.';
-  if (e.status === 429) return 'OpenAI je přetížené – zkus to za chvilku.';
-  if (e instanceof TypeError) return 'Nepodařilo se spojit s OpenAI.';
-  return 'OpenAI: ' + (e.message || 'neznámá chyba');
+  if (e.status === 401) return who + ': klíč není platný (začíná „' + (e.api === 'cl' ? 'sk-ant-' : 'sk-') + '“?).';
+  if (/insufficient_quota|billing|quota|credit/i.test(m)) return 'Došel kredit nebo je vyčerpaný měsíční limit na ' + who + '.';
+  if (e.status === 429 || e.status === 529) return who + ' je přetížené – zkus to za chvilku.';
+  if (e instanceof TypeError) return 'Nepodařilo se spojit s ' + who + '.';
+  return who + ': ' + (e.message || 'neznámá chyba');
 }
-async function testKey() {
-  const st = $('#oaiStatus'); if (st) st.textContent = '⏳ Ověřuji…';
-  try { S.ai.model = null; await oaiChat([{ role: 'user', content: 'Odpověz jen: OK' }], 200); renderNast(); const s2 = $('#oaiStatus'); if (s2) s2.textContent = '✅ Funguje, model ' + S.ai.model; toast('Klíč funguje ✅ (' + S.ai.model + ')'); }
-  catch (e) { if (st) st.textContent = '⚠️ ' + oaiErr(e); }
+async function testKey(kind) {
+  const st = $('#' + kind + 'Status'); if (st) st.textContent = '⏳ Ověřuji…';
+  try {
+    let model;
+    if (kind === 'cl') { await clChat('', 'Odpověz jen: OK', 200); model = CL_MODEL; }
+    else { S.ai.model = null; await oaiChat([{ role: 'user', content: 'Odpověz jen: OK' }], 200); model = S.ai.model; }
+    renderNast(); const s2 = $('#' + kind + 'Status'); if (s2) s2.textContent = '✅ Funguje, model ' + model; toast('Klíč funguje ✅ (' + model + ')');
+  } catch (e) { if (st) st.textContent = '⚠️ ' + oaiErr(e); }
 }
 function aiContext() {
   const g = S.goal, gs = goalStats();
@@ -688,10 +725,10 @@ const AI_SYS = 'Jsi kondiční trenér amatérského fotbalisty Martina. Cvičí
 async function aiCall(user) {
   const out = $('#aiOut'); if (out) out.innerHTML = '<div class="ai">⏳ Trenér přemýšlí…</div>';
   try {
-    const res = await oaiChat([{ role: 'system', content: AI_SYS }, { role: 'user', content: user }], 1500);
-    const txt = ((res.choices && res.choices[0] && res.choices[0].message && res.choices[0].message.content) || '').trim() || '(prázdná odpověď)';
+    const res = await aiChat(AI_SYS, user, 1500);
+    const txt = res.text || '(prázdná odpověď)';
     const mo = dateStr().slice(0, 7); if (S.ai.month !== mo) { S.ai.month = mo; S.ai.calls = 0; S.ai.tokIn = 0; S.ai.tokOut = 0; }
-    S.ai.calls++; if (res.usage) { S.ai.tokIn += res.usage.prompt_tokens || 0; S.ai.tokOut += res.usage.completion_tokens || 0; }
+    S.ai.calls++; S.ai.tokIn += res.tokIn; S.ai.tokOut += res.tokOut; S.ai.used = res.model;
     S.ai.last = txt; S.ai.lastDate = dateStr(); save(); renderPokrok();
   } catch (e) { if (out) out.innerHTML = '<div class="ai">⚠️ ' + esc(oaiErr(e)) + '</div>'; }
 }
